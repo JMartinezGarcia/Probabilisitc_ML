@@ -55,18 +55,7 @@ class ExponentialFamily(abc.ABC):
         
         
         return self.log_base_measure(x) + linear_term - self.log_partition_func(nu)
-        
-        
-        #linear_term = np.einsum('ij, ikl -> kjl', nu, self.sufficient_stats(x))
-        
-        
-        
-        #return self.log_base_measure(x) + linear_term - self.log_partition_func(nu)
-    
-    
-            
-            
-        
+           
     def pdf(self, x: ArrayLike, params: ArrayLike) -> ArrayLike:
         '''
         pdf = exp (log pdf)     |   shape (batch_data, dim_data, batch_param)
@@ -79,7 +68,7 @@ class BernoulliDist(ExponentialFamily):
         '''
         suff_stats(x) = x   |   shape (dim_nu, batch_data)
         '''
-        return x.T
+        return x[None,:]
     
     def log_base_measure(self, x: ArrayLike) -> ArrayLike:
         '''
@@ -97,6 +86,8 @@ class BernoulliDist(ExponentialFamily):
         '''
         nu = log(params / (1 - params))     |   shape (dim_nu, batch_params)
         '''
+        params = params[None, :]
+        
         return np.log(params / (1 - params))
     
     
@@ -106,7 +97,7 @@ class GaussianDist(ExponentialFamily):
         '''
         suff_stats(x) = [x,x**2]    |   shape (dim_nu, batch_data)
         '''
-        return np.array([x, x**2]).squeeze()
+        return np.array([x, x**2])
     
     def log_base_measure(self, x: ArrayLike) -> ArrayLike:
         '''
@@ -141,18 +132,19 @@ class PoissonDist(ExponentialFamily):
         suff_stats(x) = x   |   shape (dim_nu, batch_data)
         '''
         
-        return x.T
+        return x[None,:]
     
     def log_base_measure(self, x: ArrayLike) -> ArrayLike:
         '''
         log h(x) = -np.log(x!)     |   shape (batch_x, 1)
         '''
-        return - gammaln(x+1)
+        return - gammaln(x+1)[:,None]
     
     def natural_params(self, params: ArrayLike) -> ArrayLike:
         '''
         nu = log(params)    |   shape (dim_nu, batch_params)
         '''
+        params = params[None,:]
         
         return np.log(params)
     
@@ -189,28 +181,31 @@ if __name__ == "__main__":
     poi = PoissonDist()
     bern = BernoulliDist()
     
-    
-    params_gauss = np.array([[5.,1.],[4.,20.]]).T # shape (2,2) (batch_param,dim_nu)
-    params_bern = np.array([0.8,0.7])[None,:] # shape (1,2)
-    params_poi = np.array([0.4,0.5,0.6])[None,:] # shape (1,3)
-    
-    
-    
-    data_gauss = np.arange(4,7)[:,None] # shape (10,1)
-    data_bern = np.array([0,1,1,0,1])[:,None] # shape (5,1)
-    data_poi = np.array([4.,5.,6.])[:,None] # shape (3,1)
+    mu_gauss = np.array([5.,4.])
+    var_gauss = np.array([2.,3.])
+    params_gauss = np.array([mu_gauss, var_gauss])
+    params_bern = np.array([0.8,0.7]) # shape (1,2)
+    params_poi = np.array([0.4,0.5,0.6]) # shape (1,3)
     
     
-    np.testing.assert_allclose(bernoulli.pmf(data_bern,params_bern),
-                               bern.pdf(x=data_bern,params=params_bern))
+    
+    data_gauss = np.arange(4,7) # shape (3,)
+    data_bern = np.array([0,1,1,0,1]) # shape (5,)
+    data_poi = np.array([4.,5.]) # shape (3,)
+    
+    
+    
+    np.testing.assert_allclose(bern.pdf(x=data_bern,params=params_bern),
+                                bernoulli.pmf(data_bern[:,None],params_bern[None,:]))
+                            
     
     
     np.testing.assert_allclose(gaussian.pdf(x=data_gauss,params=params_gauss),
-                               norm.pdf(data_gauss,loc=params_gauss[0],scale = np.sqrt(params_gauss[1])))
+                               norm.pdf(data_gauss[:,None],loc=params_gauss[0][None,:],scale = np.sqrt(params_gauss[1][None,:])))
     
     
     np.testing.assert_allclose(poi.pdf(x=data_poi, params=params_poi), 
-                               poisson.pmf(k = data_poi, mu = params_poi))
+                               poisson.pmf(k = data_poi[:,None], mu = params_poi[None,:]))
     
     print("Tests Passed!!!")
     
